@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	Database Database
+	JWT      JWT
 }
 
 func Load() *Config {
@@ -26,6 +27,11 @@ type Database struct {
 	User     string `env:"DB_USER"`
 	Password string `env:"DB_PASSWORD"`
 	Name     string `env:"DB_NAME"`
+}
+
+type JWT struct {
+	Secret string `env:"JWT_SECRET"`
+	Issuer string `env:"JWT_ISSUER"`
 }
 
 func (d Database) DataSourceName() string {
