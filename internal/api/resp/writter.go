@@ -25,7 +25,7 @@ type HTTPError struct {
 
 type Empty struct{}
 
-func WriteJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
+func WriteJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	jsonData, _ := json.Marshal(data)

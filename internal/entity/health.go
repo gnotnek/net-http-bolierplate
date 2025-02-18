@@ -3,8 +3,8 @@ package entity
 type Health string
 
 const (
-	HealthStatusOK Health = "OK"
-	HealthStatusKO Health = "KO"
+	HealthStatusOK     Health = "OK"
+	HealthStatusFailed Health = "Failed"
 )
 
 type HealthCheck struct {
