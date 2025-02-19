@@ -13,7 +13,7 @@ type httpHandler struct {
 	jwt     *jwt.JWT
 }
 
-func NewHTTPHandler(service *Service, jwt *jwt.JWT) *httpHandler {
+func NewUserHandler(service *Service, jwt *jwt.JWT) *httpHandler {
 	return &httpHandler{
 		service: service,
 		jwt:     jwt,

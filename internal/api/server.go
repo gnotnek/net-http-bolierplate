@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net-http-boilerplate/internal/api/resp"
+	"net-http-boilerplate/internal/auth"
 	"net-http-boilerplate/internal/config"
 	"net-http-boilerplate/internal/jwt"
+	"net-http-boilerplate/internal/post"
 	"net-http-boilerplate/internal/postgres"
 	"net-http-boilerplate/internal/user"
 	"net/http"
@@ -27,12 +29,19 @@ func NewServer() *Server {
 	jwtService := jwt.NewJWT(cfg.JWT)
 
 	// Initialize auth middleware
-	// authMiddleware := auth.NewMiddleware(jwtService)
+	authMiddleware := auth.NewMiddleware(jwtService)
 
-	// Initialize user service
+	// Repo
 	userRepo := user.NewUserRepository(db)
+	postRepo := post.NewPostRepository(db)
+
+	// Service
 	userService := user.NewUserService(userRepo)
-	userHandler := user.NewHTTPHandler(userService, jwtService)
+	postService := post.NewPostService(postRepo)
+
+	// Handler
+	userHandler := user.NewUserHandler(userService, jwtService)
+	postHandler := post.NewPostHandler(postService)
 
 	r := chi.NewRouter()
 
@@ -45,6 +54,14 @@ func NewServer() *Server {
 		r.Post("/register", userHandler.Register)
 		r.Post("/login", userHandler.Login)
 		r.Post("/refresh", userHandler.RefreshToken)
+	})
+
+	r.With(authMiddleware.AuthRequired).Route("/posts", func(r chi.Router) {
+		r.Get("/", postHandler.FindAll)
+		r.Post("/", postHandler.Create)
+		r.Get("/{id}", postHandler.FindByID)
+		r.Put("/{id}", postHandler.Update)
+		r.Delete("/{id}", postHandler.Delete)
 	})
 
 	return &Server{
