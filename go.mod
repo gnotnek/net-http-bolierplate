@@ -24,6 +24,7 @@ require (
 )
 
 require (
+	github.com/go-chi/chi/v5 v5.2.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/jinzhu/inflection v1.0.0 // indirect

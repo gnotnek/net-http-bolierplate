@@ -51,7 +51,7 @@ func WriteJSONWithPaginateResponse(w http.ResponseWriter, statusCode int, data i
 	w.Write(jsonData)
 }
 
-func WriteError(w http.ResponseWriter, statusCode int, err error) {
+func WriteError(w http.ResponseWriter, err error) {
 	code := http.StatusInternalServerError
 	msg := "Something went wrong"
 
@@ -68,6 +68,6 @@ func WriteError(w http.ResponseWriter, statusCode int, err error) {
 
 	response, _ := json.Marshal(errResponse)
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
+	w.WriteHeader(code)
 	w.Write(response)
 }

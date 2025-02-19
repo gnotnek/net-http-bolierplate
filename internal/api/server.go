@@ -3,14 +3,18 @@ package api
 import (
 	"context"
 	"fmt"
+	"net-http-boilerplate/internal/api/resp"
 	"net-http-boilerplate/internal/config"
+	"net-http-boilerplate/internal/jwt"
 	"net-http-boilerplate/internal/postgres"
+	"net-http-boilerplate/internal/user"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,13 +23,37 @@ func NewServer() *Server {
 	db := postgres.NewGORM(&cfg.Database)
 	postgres.Migrate(db)
 
+	// Initialize JWT service
+	jwtService := jwt.NewJWT(cfg.JWT)
+
+	// Initialize auth middleware
+	// authMiddleware := auth.NewMiddleware(jwtService)
+
+	// Initialize user service
+	userRepo := user.NewUserRepository(db)
+	userService := user.NewUserService(userRepo)
+	userHandler := user.NewHTTPHandler(userService, jwtService)
+
+	r := chi.NewRouter()
+
+	// Routes
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		resp.WriteJSON(w, http.StatusOK, "Pong")
+	})
+
+	r.Route("/users", func(r chi.Router) {
+		r.Post("/register", userHandler.Register)
+		r.Post("/login", userHandler.Login)
+		r.Post("/refresh", userHandler.RefreshToken)
+	})
+
 	return &Server{
-		router: http.NewServeMux(),
+		router: r,
 	}
 }
 
 type Server struct {
-	router *http.ServeMux
+	router *chi.Mux
 }
 
 // Run method of the Server struct runs the HTTP server on the specified port. It initializes
