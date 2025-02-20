@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"net-http-boilerplate/internal/entity"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -27,6 +28,8 @@ func NewPostService(repo Repo) *Service {
 }
 
 func (s *Service) Create(ctx context.Context, post *entity.Post) error {
+	slug := strings.ReplaceAll(strings.ToLower(post.Title), " ", "-")
+	post.Slug = slug
 	return s.repo.Create(ctx, post)
 }
 
@@ -67,7 +70,14 @@ func (s *Service) FindByID(ctx context.Context, id int) (*entity.Post, error) {
 }
 
 func (s *Service) Update(ctx context.Context, post *entity.Post) error {
-	return s.repo.Update(ctx, post)
+	post.Slug = strings.ReplaceAll(strings.ToLower(post.Title), " ", "-")
+	err := s.repo.Update(ctx, post)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return ErrPostNotFound
+		}
+	}
+	return err
 }
 
 func (s *Service) Delete(ctx context.Context, id int) error {
