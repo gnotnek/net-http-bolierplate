@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net-http-boilerplate/internal/api/resp"
 	"net-http-boilerplate/internal/auth"
+	"net-http-boilerplate/internal/category"
 	"net-http-boilerplate/internal/config"
 	"net-http-boilerplate/internal/jwt"
 	"net-http-boilerplate/internal/post"
@@ -34,14 +35,17 @@ func NewServer() *Server {
 	// Repo
 	userRepo := user.NewUserRepository(db)
 	postRepo := post.NewPostRepository(db)
+	categoryRepo := category.NewCategoryRepository(db)
 
 	// Service
 	userService := user.NewUserService(userRepo)
 	postService := post.NewPostService(postRepo)
+	categoryService := category.NewCategoryService(categoryRepo)
 
 	// Handler
 	userHandler := user.NewUserHandler(userService, jwtService)
 	postHandler := post.NewPostHandler(postService)
+	categoryHandler := category.NewCategoryHandler(categoryService)
 
 	r := chi.NewRouter()
 
@@ -62,6 +66,14 @@ func NewServer() *Server {
 		r.Get("/{id}", postHandler.FindByID)
 		r.Put("/{id}", postHandler.Update)
 		r.Delete("/{id}", postHandler.Delete)
+	})
+
+	r.With(authMiddleware.AuthRequired).Route("/category", func(r chi.Router) {
+		r.Get("/", categoryHandler.GetCategories)
+		r.Get("/{id}", categoryHandler.GetCategory)
+		r.Post("/", categoryHandler.CreateCategory)
+		r.Put("/{id}", categoryHandler.UpdateCategory)
+		r.Delete("/{id}", categoryHandler.DeleteCategory)
 	})
 
 	return &Server{
