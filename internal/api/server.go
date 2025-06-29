@@ -7,9 +7,10 @@ import (
 	"net-http-boilerplate/internal/auth"
 	"net-http-boilerplate/internal/category"
 	"net-http-boilerplate/internal/config"
-	"net-http-boilerplate/internal/jwt"
+	"net-http-boilerplate/internal/pkg/encrypt"
+	"net-http-boilerplate/internal/pkg/jwt"
+	"net-http-boilerplate/internal/pkg/postgres"
 	"net-http-boilerplate/internal/post"
-	"net-http-boilerplate/internal/postgres"
 	"net-http-boilerplate/internal/user"
 	"net/http"
 	"os"
@@ -23,6 +24,18 @@ import (
 
 func NewServer() *Server {
 	cfg := config.Load()
+
+	// encrypt
+	err := encrypt.Init(cfg.AppConfig.AppSalt, cfg.AppConfig.AppSaltIV, cfg.AppConfig.AppEncryptMethod)
+	if err != nil {
+		log.Panic().Err(err).Msgf("something went wrong: %s", err)
+		panic(err)
+	}
+
+	// File upload
+	// uploader := upload.NewChunkedUploader(cfg.ChunkUpload.StoragePath)
+
+	// database
 	db := postgres.NewGORM(&cfg.Database)
 	postgres.Migrate(db)
 

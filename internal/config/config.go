@@ -8,8 +8,10 @@ import (
 )
 
 type Config struct {
-	Database Database
-	JWT      JWT
+	Database    Database
+	JWT         JWT
+	AppConfig   AppConfig
+	ChunkUpload ChunkUploadConfig
 }
 
 func Load() *Config {
@@ -32,6 +34,18 @@ type Database struct {
 type JWT struct {
 	Secret string `env:"JWT_SECRET"`
 	Issuer string `env:"JWT_ISSUER"`
+}
+
+type AppConfig struct {
+	AppSalt          string `env:"APP_SALT"`
+	AppSaltIV        string `env:"APP_SALT_IV"`
+	AppEncryptMethod string `env:"APP_ENCRYPT_METHOD"`
+}
+
+type ChunkUploadConfig struct {
+	MaxChunkSize   int64  `env:"CHUNK_SIZE"`
+	StoragePath    string `env:"STORAGE_PATH"`
+	StorageBaseURL string `env:"STORAGE_BASE_URL"`
 }
 
 func (d Database) DataSourceName() string {

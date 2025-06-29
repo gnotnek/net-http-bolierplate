@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"net-http-boilerplate/internal/api/resp"
-	"net-http-boilerplate/internal/jwt"
+	"net-http-boilerplate/internal/pkg/jwt"
 	"net/http"
 	"strings"
 )

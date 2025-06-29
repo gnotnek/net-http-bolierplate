@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net-http-boilerplate/internal/api/resp"
 	"net-http-boilerplate/internal/entity"
-	"net-http-boilerplate/internal/jwt"
+	"net-http-boilerplate/internal/pkg/jwt"
 	"net/http"
 )
 
@@ -62,7 +62,7 @@ func (h *httpHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, refreshToken, err := h.jwt.GenerateToken(user.ID, user.Email)
+	accessToken, refreshToken, err := h.jwt.GenerateToken(user.ID.String(), user.Email)
 	if err != nil {
 		resp.WriteError(w, err)
 		return
