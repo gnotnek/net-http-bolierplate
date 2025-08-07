@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"net-http-boilerplate/internal/entity"
 	"net/http"
 )
 
@@ -32,15 +33,15 @@ func WriteJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Write(jsonData)
 }
 
-func WriteJSONWithPaginateResponse(w http.ResponseWriter, statusCode int, data interface{}, page, total, limit int) {
+func WriteJSONWithPaginateResponse(w http.ResponseWriter, statusCode int, data interface{}, stats *entity.Stats) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
-	totalPage := int(math.Ceil(float64(total) / float64(limit)))
+	totalPage := int(math.Ceil(float64(stats.Total) / float64(stats.Limit)))
 	meta := Meta{
-		Page:      page,
+		Page:      stats.Page,
 		PageTotal: totalPage,
-		Total:     total,
+		Total:     stats.Total,
 	}
 
 	jsonData, _ := json.Marshal(DataPaginate{
