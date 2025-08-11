@@ -10,6 +10,7 @@ import (
 	"net-http-boilerplate/internal/pkg/encrypt"
 	"net-http-boilerplate/internal/pkg/jwt"
 	"net-http-boilerplate/internal/pkg/postgres"
+	"net-http-boilerplate/internal/pkg/validator"
 	"net-http-boilerplate/internal/post"
 	"net-http-boilerplate/internal/user"
 	"net/http"
@@ -32,8 +33,8 @@ func NewServer() *Server {
 		panic(err)
 	}
 
-	// File upload
-	// uploader := upload.NewChunkedUploader(cfg.ChunkUpload.StoragePath)
+	// validator
+	validator := validator.NewValidator()
 
 	// database
 	db := postgres.NewGORM(&cfg.Database)
@@ -51,18 +52,18 @@ func NewServer() *Server {
 	categoryRepo := category.NewCategoryRepository(db)
 
 	// Service
-	userService := user.NewUserService(userRepo)
+	userService := user.NewUserService(userRepo, jwtService)
 	postService := post.NewPostService(postRepo)
 	categoryService := category.NewCategoryService(categoryRepo)
 
 	// Handler
-	userHandler := user.NewUserHandler(userService, jwtService)
+	userHandler := user.NewUserHandler(userService, validator)
 	postHandler := post.NewPostHandler(postService)
 	categoryHandler := category.NewCategoryHandler(categoryService)
 
 	r := chi.NewRouter()
 
-	// Routes
+	// Public routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		resp.WriteJSON(w, http.StatusOK, "Pong")
 	})
@@ -70,28 +71,35 @@ func NewServer() *Server {
 	r.Route("/users", func(r chi.Router) {
 		r.Post("/register", userHandler.Register)
 		r.Post("/login", userHandler.Login)
-		r.Post("/refresh", userHandler.RefreshToken)
 	})
 
-	r.With(authMiddleware.AuthRequired).Route("/posts", func(r chi.Router) {
-		r.Get("/", postHandler.FindAll)
-		r.Post("/", postHandler.Create)
-		r.Get("/{id}", postHandler.FindByID)
-		r.Put("/{id}", postHandler.Update)
-		r.Delete("/{id}", postHandler.Delete)
-	})
+	// Authenticated routes
+	r.Group(func(r chi.Router) {
+		r.Use(authMiddleware.AuthRequired)
 
-	r.With(authMiddleware.AuthRequired).Route("/category", func(r chi.Router) {
-		r.Get("/", categoryHandler.GetCategories)
-		r.Get("/{id}", categoryHandler.GetCategory)
-		r.Post("/", categoryHandler.CreateCategory)
-		r.Put("/{id}", categoryHandler.UpdateCategory)
-		r.Delete("/{id}", categoryHandler.DeleteCategory)
+		// Posts
+		r.Route("/posts", func(r chi.Router) {
+			r.Get("/", postHandler.FindAll)
+			r.Post("/", postHandler.Create)
+			r.Get("/{id}", postHandler.FindByID)
+			r.Put("/{id}", postHandler.Update)
+			r.Delete("/{id}", postHandler.Delete)
+		})
+
+		// Categories
+		r.Route("/category", func(r chi.Router) {
+			r.Get("/", categoryHandler.GetCategories)
+			r.Get("/{id}", categoryHandler.GetCategory)
+			r.Post("/", categoryHandler.CreateCategory)
+			r.Put("/{id}", categoryHandler.UpdateCategory)
+			r.Delete("/{id}", categoryHandler.DeleteCategory)
+		})
 	})
 
 	return &Server{
 		router: r,
 	}
+
 }
 
 type Server struct {

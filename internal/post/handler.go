@@ -33,7 +33,7 @@ func (h *httpHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	data, err := h.service.Create(ctx, &req)
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Msg("failed to create post")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to create post: %v", err)
 		resp.WriteError(w, err)
 		return
 	}
@@ -81,7 +81,7 @@ func (h *httpHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to fetch posts")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to fetch posts: %v", err)
 		resp.WriteError(w, err)
 		return
 	}
@@ -109,7 +109,7 @@ func (h *httpHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to fetch post")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to fetch post: %v", err)
 		resp.WriteError(w, err)
 		return
 	}
@@ -150,12 +150,12 @@ func (h *httpHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to update post")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to update post: %v", err)
 		resp.WriteError(w, err)
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, post)
+	resp.WriteSuccess(w, http.StatusOK, "success", post)
 }
 
 func (h *httpHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -166,21 +166,21 @@ func (h *httpHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("invalid id")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "invalid id"))
 		return
 	}
 
 	if err := h.service.Delete(ctx, id); err != nil {
 		if err == apperror.ErrResourceNotFound {
 			log.Ctx(ctx).Error().Err(err).Msg("post not found")
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "post not found"})
+			resp.WriteError(w, resp.NewError(http.StatusNotFound, "post not found"))
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to delete post")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to delete post: %v", err)
 		resp.WriteError(w, err)
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, map[string]string{"message": "post deleted"})
+	resp.WriteSuccess(w, http.StatusOK, "success", nil)
 }
