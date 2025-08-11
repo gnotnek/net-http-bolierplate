@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net-http-boilerplate/internal/api/resp"
 	"net-http-boilerplate/internal/entity"
+	apperror "net-http-boilerplate/internal/pkg/app-error"
 	"net/http"
 	"strconv"
 
@@ -30,30 +31,53 @@ func (h *httpHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post := &entity.Post{
-		Title:      req.Title,
-		Content:    req.Content,
-		ImageURL:   req.ImageURL,
-		CategoryID: req.CategoryID,
-	}
-
-	if err := h.service.Create(ctx, post); err != nil {
+	data, err := h.service.Create(ctx, &req)
+	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("failed to create post")
 		resp.WriteError(w, err)
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusCreated, post)
+	resp.WriteSuccess(w, http.StatusOK, "success", data)
 }
 
 func (h *httpHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	posts, err := h.service.FindAll(ctx)
+	pageStr := r.URL.Query().Get("page")
+	perPageStr := r.URL.Query().Get("perPage")
+
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	if perPageStr == "" {
+		perPageStr = "10"
+	}
+
+	pageInt, err := strconv.Atoi(pageStr)
 	if err != nil {
-		if err == ErrPostNotFound {
+		log.Ctx(ctx).Err(err).Msg("invalid 'page' query param")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "'page' must be a number"))
+		return
+	}
+
+	perPageInt, err := strconv.Atoi(perPageStr)
+	if err != nil {
+		log.Ctx(ctx).Err(err).Msg("invalid 'perPage' query param")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "'perPage' must be a number"))
+		return
+	}
+
+	filter := &entity.Filter{
+		Page:    &pageInt,
+		PerPage: &perPageInt,
+	}
+
+	posts, stats, err := h.service.FindAll(ctx, filter)
+	if err != nil {
+		if err == apperror.ErrResourceNotFound {
 			log.Ctx(ctx).Error().Err(err).Msg("no posts found")
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "post not found"})
+			resp.WriteJSONWithPaginateResponse(w, http.StatusOK, "success", posts, stats)
 			return
 		}
 
@@ -62,32 +86,7 @@ func (h *httpHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, posts)
-}
-
-func (h *httpHandler) FindByCategory(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	category := r.URL.Query().Get("category")
-	if category == "" {
-		log.Ctx(ctx).Error().Msg("category is required")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "category is required"})
-		return
-	}
-
-	posts, err := h.service.FindByCategory(ctx, category)
-	if err != nil {
-		if err == ErrPostNotFound {
-			log.Ctx(ctx).Error().Err(err).Msg("no posts found")
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "no posts found"})
-			return
-		}
-
-		resp.WriteError(w, err)
-		return
-	}
-
-	resp.WriteJSON(w, http.StatusOK, posts)
+	resp.WriteJSONWithPaginateResponse(w, http.StatusOK, "success", posts, stats)
 }
 
 func (h *httpHandler) FindByID(w http.ResponseWriter, r *http.Request) {
@@ -98,15 +97,15 @@ func (h *httpHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("invalid id")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "invalid id"))
 		return
 	}
 
 	post, err := h.service.FindByID(ctx, id)
 	if err != nil {
-		if err == ErrPostNotFound {
+		if err == apperror.ErrResourceNotFound {
 			log.Ctx(ctx).Error().Err(err).Msg("post not found")
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "post not found"})
+			resp.WriteError(w, resp.NewError(http.StatusNotFound, "post not found"))
 			return
 		}
 
@@ -115,7 +114,7 @@ func (h *httpHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, post)
+	resp.WriteSuccess(w, http.StatusOK, "success", post)
 }
 
 func (h *httpHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -126,14 +125,14 @@ func (h *httpHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("invalid id")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "invalid id"))
 		return
 	}
 
 	var req UpdatePostRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Ctx(ctx).Error().Err(err).Msg("failed to decode request")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "invalid request"))
 		return
 	}
 
@@ -141,14 +140,13 @@ func (h *httpHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ID:         id,
 		Title:      req.Title,
 		Content:    req.Content,
-		ImageURL:   req.ImageURL,
 		CategoryID: req.CategoryID,
 	}
 
 	if err := h.service.Update(ctx, post); err != nil {
-		if err == ErrPostNotFound {
+		if err == apperror.ErrResourceNotFound {
 			log.Ctx(ctx).Error().Err(err).Msg("post not found")
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "post not found"})
+			resp.WriteError(w, resp.NewError(http.StatusBadRequest, "post not found"))
 			return
 		}
 
@@ -173,7 +171,7 @@ func (h *httpHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.Delete(ctx, id); err != nil {
-		if err == ErrPostNotFound {
+		if err == apperror.ErrResourceNotFound {
 			log.Ctx(ctx).Error().Err(err).Msg("post not found")
 			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "post not found"})
 			return
