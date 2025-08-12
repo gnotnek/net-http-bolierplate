@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net-http-boilerplate/internal/api/resp"
 	"net-http-boilerplate/internal/entity"
+	apperror "net-http-boilerplate/internal/pkg/app-error"
 	"net/http"
 	"strconv"
 
@@ -24,46 +25,65 @@ func (h *httpHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req CreateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		log.Ctx(ctx).Error().Err(err).Msg("failed to decode request")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "bad request"))
 		return
 	}
 
-	category := &entity.Category{
-		Name: req.Name,
-	}
-
-	if err := h.service.Create(ctx, category); err != nil {
-		if err == ErrCategoryAlreadyExists {
-			resp.WriteJSON(w, http.StatusConflict, map[string]string{"message": "category already exists"})
-			return
-		}
-		if err == ErrCategoryNotFound {
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "category not found"})
-			return
-		}
-
-		log.Ctx(ctx).Error().Err(err).Msg("failed to create category")
+	if err := h.service.Create(ctx, &req); err != nil {
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to create category: %s", err)
 		resp.WriteError(w, err)
 		return
 	}
+
+	resp.WriteSuccess(w, http.StatusOK, "success", nil)
+
 }
 
 func (h *httpHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	categories, err := h.service.FindAll(ctx)
+	pageStr := r.URL.Query().Get("page")
+	perPageStr := r.URL.Query().Get("perPage")
+
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	if perPageStr == "" {
+		perPageStr = "10"
+	}
+
+	pageInt, err := strconv.Atoi(pageStr)
 	if err != nil {
-		if err == ErrCategoryNotFound {
-			log.Ctx(ctx).Error().Err(err).Msg("categories not found")
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "categories not found"})
+		log.Ctx(ctx).Err(err).Msg("invalid 'page' query param")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "'page' must be a number"))
+		return
+	}
+
+	perPageInt, err := strconv.Atoi(perPageStr)
+	if err != nil {
+		log.Ctx(ctx).Err(err).Msg("invalid 'perPage' query param")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "'perPage' must be a number"))
+		return
+	}
+
+	filter := &entity.Filter{
+		Page:    &pageInt,
+		PerPage: &perPageInt,
+	}
+
+	res, stats, err := h.service.FindAll(ctx, filter)
+	if err != nil {
+		if err == apperror.ErrResourceNotFound {
+			resp.WriteJSONWithPaginateResponse(w, http.StatusOK, "success", res, stats)
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to get categories")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to fetch categories: %v", err)
 		resp.WriteError(w, err)
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, categories)
+	resp.WriteJSONWithPaginateResponse(w, http.StatusOK, "success", res, stats)
 }
 
 func (h *httpHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
@@ -71,25 +91,25 @@ func (h *httpHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Msg("invalid request")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		log.Ctx(ctx).Error().Err(err).Msg("bad request, invalid id")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "bad request"))
 		return
 	}
 
 	category, err := h.service.FindByID(ctx, id)
 	if err != nil {
-		if err == ErrCategoryNotFound {
+		if err == apperror.ErrResourceNotFound {
 			log.Ctx(ctx).Error().Err(err).Msg("category not found")
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "category not found"})
+			resp.WriteError(w, resp.NewError(http.StatusNotFound, "category not found"))
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to get category")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to get category: %s", err)
 		resp.WriteError(w, err)
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, category)
+	resp.WriteSuccess(w, http.StatusOK, "success", category)
 }
 
 func (h *httpHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
@@ -97,34 +117,32 @@ func (h *httpHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Msg("invalid request")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		log.Ctx(ctx).Error().Err(err).Msg("bad request, invalid id")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "bad request"))
 		return
 	}
 
 	var req UpdateCategoryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		log.Ctx(ctx).Error().Err(err).Msg("bad request")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "bad request"))
 		return
 	}
 
-	category := &entity.Category{
-		ID:   id,
-		Name: req.Name,
-	}
-
-	if err := h.service.Update(ctx, category); err != nil {
-		if err == ErrCategoryNotFound {
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "category not found"})
+	res, err := h.service.Update(ctx, id, req)
+	if err != nil {
+		if err == apperror.ErrResourceNotFound {
+			log.Ctx(ctx).Error().Err(err).Msg("category not found")
+			resp.WriteError(w, resp.NewError(http.StatusNotFound, "category not found"))
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to update category")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to update category: %s", err)
 		resp.WriteError(w, err)
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, map[string]string{"message": "category updated"})
+	resp.WriteSuccess(w, http.StatusOK, "success", res)
 }
 
 func (h *httpHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
@@ -132,21 +150,22 @@ func (h *httpHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		log.Ctx(ctx).Error().Err(err).Msg("invalid request")
-		resp.WriteJSON(w, http.StatusBadRequest, map[string]string{"message": "invalid request"})
+		log.Ctx(ctx).Error().Err(err).Msg("bad request, invalid id")
+		resp.WriteError(w, resp.NewError(http.StatusBadRequest, "bad request"))
 		return
 	}
 
 	if err := h.service.Delete(ctx, id); err != nil {
-		if err == ErrCategoryNotFound {
-			resp.WriteJSON(w, http.StatusNotFound, map[string]string{"message": "category not found"})
+		if err == apperror.ErrResourceNotFound {
+			log.Ctx(ctx).Error().Err(err).Msg("category not found")
+			resp.WriteError(w, resp.NewError(http.StatusNotFound, "category not found"))
 			return
 		}
 
-		log.Ctx(ctx).Error().Err(err).Msg("failed to delete category")
+		log.Ctx(ctx).Error().Err(err).Msgf("failed to delete category: %s", err)
 		resp.WriteError(w, err)
 		return
 	}
 
-	resp.WriteJSON(w, http.StatusOK, map[string]string{"message": "category deleted"})
+	resp.WriteSuccess(w, http.StatusOK, "success", nil)
 }
