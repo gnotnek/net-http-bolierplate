@@ -54,10 +54,14 @@ func (j *JWT) GenerateToken(id string, email string) (string, string, error) {
 		return "", "", err
 	}
 
-	refreshClaims := jwt.RegisteredClaims{
-		Issuer:    encryptedIssuer,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 7)), // Refresh token valid for 7 days
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	refreshClaims := Claims{
+		ID:    encryptedID,
+		Email: encryptedEmail,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    encryptedIssuer,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 7)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
 	}
 
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
