@@ -12,6 +12,7 @@ type Config struct {
 	JWT         JWT
 	AppConfig   AppConfig
 	ChunkUpload ChunkUploadConfig
+	Redis       Redis
 }
 
 func Load() *Config {
@@ -46,6 +47,10 @@ type ChunkUploadConfig struct {
 	MaxChunkSize   int64  `env:"CHUNK_SIZE"`
 	StoragePath    string `env:"STORAGE_PATH"`
 	StorageBaseURL string `env:"STORAGE_BASE_URL"`
+}
+
+type Redis struct {
+	URL string `env:"REDIS_URL"`
 }
 
 func (d Database) DataSourceName() string {
